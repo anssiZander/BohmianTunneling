@@ -12,27 +12,27 @@ if (!extFloatRT) {
 }
 
 const params = {
-  simScale: 1.0,
-  stepsPerFrame: 50,
+  simScale: .5,
+  stepsPerFrame: 10,
 
   hbar: 6.0,
   mass: 1.0,
   p0: 4.5,
-  dt: 0.01,
+  dt: 0.02,
 
-  packetX: 0.4,
+  packetX: 0.3,
   packetY: 0.3,
   packetSigma: 30.0,
 
   barrierY: 0.55,
-  barrierThick: 100.0,
+  barrierThick: 50.0,
   V0: 5.0,
 
-  absorbPx: 110.0,
-  absorbStrength: 0.25,
+  absorbPx: 40.0,
+  absorbStrength: 3.,
   particleKillMargin: 12.0,
 
-  nParticles: 200,
+  nParticles: 400,
   rhoMin: 1e-6,
   velClamp: 160.0,
   guidingMode: 1,
@@ -203,11 +203,13 @@ function addSectionHeader(label) {
   controls.appendChild(header);
 }
 
+addSectionHeader("Performance");
+addSlider("simScale", "sim scale", 0.25, 1.0, 0.05, () => rebuildSimulation());
 addSlider("stepsPerFrame", "Steps/frame", 1, 100, 1);
 
 addSectionHeader("Physical Parameters");
 addSlider("p0", "momentum p", 0.5, 8.0, 0.1, () => resetAll());
-addSlider("dt", "dt", 0.005, 0.02, 0.001);
+addSlider("dt", "dt", 0.01, 0.04, 0.001);
 //addSlider("packetX", "packet start x", 0.05, 0.95, 0.01, () => resetAll());
 //addSlider("packetY", "packet start y", 0.05, 0.95, 0.01, () => resetAll());
 addSlider("packetSigma", "packet sigma", 8.0, 80.0, 1.0, () => resetAll());
@@ -1003,7 +1005,9 @@ function guidingModeLabel() {
 }
 
 function updateStats() {
-  statsEl.innerHTML = `<b>Guiding</b>: ${guidingModeLabel()}`;
+  statsEl.innerHTML =
+    `<b>Guiding</b>: ${guidingModeLabel()}<br>` +
+    `<b>Sim Grid</b>: ${simW} x ${simH} (${fmt(params.simScale)}x)`;
 }
 
 function rebuildSimulation() {
