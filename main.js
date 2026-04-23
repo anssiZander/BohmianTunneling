@@ -17,32 +17,33 @@ const params = {
 
   hbar: 6.0,
   mass: 1.0,
-  p0: 2.0,
+  p0: 4.5,
   dt: 0.01,
 
   packetX: 0.4,
   packetY: 0.3,
-  packetSigma: 50.0,
+  packetSigma: 30.0,
 
   barrierY: 0.55,
   barrierThick: 100.0,
-  V0: 1.0,
+  V0: 5.0,
 
   absorbPx: 110.0,
   absorbStrength: 0.25,
   particleKillMargin: 12.0,
 
-  nParticles: 1000,
+  nParticles: 200,
   rhoMin: 1e-6,
   velClamp: 160.0,
-  guidingMode: 0,
+  guidingMode: 1,
+  spinSign: 1,
 
   visGain: 20.0,
   visGamma: 0.5,
   showPhase: 1,
 
   showParticles: 1,
-  dotSize: 10.0,
+  dotSize: 7.0,
   dotSigma: 0.28,
   dotGain: 1.,
 
@@ -87,7 +88,7 @@ const PALETTE_COMPLEMENTS = [
 
 const GUIDING_MODE_NAMES = [
   "Schrodinger",
-  "Pauli spin-1/2 (+z)"
+  "Pauli spin-1/2"
 ];
 
 const BARRIER_V0_MAX = 12.0;
@@ -225,27 +226,40 @@ addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
   group.className = "toggle-group";
 
   const btnSchrodinger = document.createElement("button");
-  btnSchrodinger.textContent = "Schrödinger";
+  btnSchrodinger.textContent = "Schrodinger";
   btnSchrodinger.addEventListener("click", () => {
     params.guidingMode = 0;
+    params.spinSign = 1;
     updateToggleButtons();
     resetAll();
   });
 
-  const btnPauli = document.createElement("button");
-  btnPauli.textContent = "Pauli (Spin)";
-  btnPauli.addEventListener("click", () => {
+  const btnPauliUp = document.createElement("button");
+  btnPauliUp.textContent = "Pauli Up";
+  btnPauliUp.addEventListener("click", () => {
     params.guidingMode = 1;
+    params.spinSign = 1;
+    updateToggleButtons();
+    resetAll();
+  });
+
+  const btnPauliDown = document.createElement("button");
+  btnPauliDown.textContent = "Pauli Down";
+  btnPauliDown.addEventListener("click", () => {
+    params.guidingMode = 1;
+    params.spinSign = -1;
     updateToggleButtons();
     resetAll();
   });
 
   group.appendChild(btnSchrodinger);
-  group.appendChild(btnPauli);
+  group.appendChild(btnPauliUp);
+  group.appendChild(btnPauliDown);
 
   function updateToggleButtons() {
     btnSchrodinger.classList.toggle("selected", params.guidingMode === 0);
-    btnPauli.classList.toggle("selected", params.guidingMode === 1);
+    btnPauliUp.classList.toggle("selected", params.guidingMode === 1 && params.spinSign > 0);
+    btnPauliDown.classList.toggle("selected", params.guidingMode === 1 && params.spinSign < 0);
   }
   updateToggleButtons();
 
@@ -467,6 +481,7 @@ function buildPrograms() {
     uMass: u(progPartUpdate, "uMass"),
     uDT: u(progPartUpdate, "uDT"),
     uGuidingMode: u(progPartUpdate, "uGuidingMode"),
+    uSpinSign: u(progPartUpdate, "uSpinSign"),
     uAbsorbPx: u(progPartUpdate, "uAbsorbPx"),
     uRhoMin: u(progPartUpdate, "uRhoMin"),
     uVelClamp: u(progPartUpdate, "uVelClamp"),
@@ -657,6 +672,7 @@ function particleUpdate() {
   gl.uniform1f(U.partUpdate.uMass, params.mass);
   gl.uniform1f(U.partUpdate.uDT, params.dt);
   gl.uniform1i(U.partUpdate.uGuidingMode, params.guidingMode | 0);
+  gl.uniform1f(U.partUpdate.uSpinSign, params.spinSign);
 
   gl.uniform1f(U.partUpdate.uAbsorbPx, params.absorbPx);
   gl.uniform1f(U.partUpdate.uParticleKillMarginPx, params.particleKillMargin);
@@ -980,6 +996,9 @@ function render() {
 }
 
 function guidingModeLabel() {
+  if ((params.guidingMode | 0) === 1) {
+    return `${GUIDING_MODE_NAMES[1]} (${params.spinSign > 0 ? "up" : "down"})`;
+  }
   return GUIDING_MODE_NAMES[params.guidingMode | 0] ?? GUIDING_MODE_NAMES[0];
 }
 
