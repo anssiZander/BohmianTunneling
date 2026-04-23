@@ -214,7 +214,50 @@ addSlider("V0", "barrier V0", 0.0, BARRIER_V0_MAX, 0.1, () => resetAll());
 addSlider("barrierThick", "barrier thickness", 4.0, 150.0, 1.0, () => resetAll());
 addSlider("absorbPx", "absorb boundary", 0.0, 160.0, 1.0);
 addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
-addCycleButton("guidingMode", "guiding law", GUIDING_MODE_NAMES, () => resetAll());
+{
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const lab = document.createElement("label");
+  lab.textContent = "guiding law";
+
+  const group = document.createElement("div");
+  group.className = "toggle-group";
+
+  const btnSchrodinger = document.createElement("button");
+  btnSchrodinger.textContent = "Schrödinger";
+  btnSchrodinger.addEventListener("click", () => {
+    params.guidingMode = 0;
+    updateToggleButtons();
+    resetAll();
+  });
+
+  const btnPauli = document.createElement("button");
+  btnPauli.textContent = "Pauli (Spin)";
+  btnPauli.addEventListener("click", () => {
+    params.guidingMode = 1;
+    updateToggleButtons();
+    resetAll();
+  });
+
+  group.appendChild(btnSchrodinger);
+  group.appendChild(btnPauli);
+
+  function updateToggleButtons() {
+    btnSchrodinger.classList.toggle("selected", params.guidingMode === 0);
+    btnPauli.classList.toggle("selected", params.guidingMode === 1);
+  }
+  updateToggleButtons();
+
+  const val = document.createElement("div");
+  val.className = "val";
+  val.textContent = "";
+
+  row.appendChild(lab);
+  row.appendChild(group);
+  row.appendChild(val);
+  controls.appendChild(row);
+}
 
 addSectionHeader("Visual Parameters");
 addToggleInt("showPhase", "show phase");
@@ -226,7 +269,7 @@ addToggleInt("showTrail", "draw trails");
 addSlider("trailHalfLife", "trail half-life", 1.0, 150.0, 1.0);
 //addSlider("trailVisGain", "trail gain", 0.1, 1.0, 0.1);
 //addSlider("trailVisGamma", "trail gamma", 0.4, 2.0, 0.05);
-addSlider("trailWidth", "trail width (px)", 0.5, 10.0, 0.1);
+addSlider("trailWidth", "trail width (px)", 1, 5.0, 1);
 
 //addSlider("visGain", "wave gain", 0.5, 20.0, 0.5);
 //addSlider("visGamma", "wave gamma", 0.3, 2.0, 0.05);
