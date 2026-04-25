@@ -13,7 +13,7 @@ if (!extFloatRT) {
 
 const params = {
   simScale: .5,
-  stepsPerFrame: 30,
+  stepsPerFrame: 20,
 
   hbar: 6.0,
   mass: 1.0,
@@ -37,6 +37,7 @@ const params = {
   velClamp: 160.0,
   guidingMode: 1,
   spinSign: 1,
+  spinMagnitude: 0.5,
 
   visGain: 20.0,
   visGamma: 0.5,
@@ -88,7 +89,7 @@ const PALETTE_COMPLEMENTS = [
 
 const GUIDING_MODE_NAMES = [
   "Schrodinger",
-  "Pauli spin-1/2"
+  "Pauli spin"
 ];
 
 const BARRIER_V0_MAX = 12.0;
@@ -217,6 +218,7 @@ addSlider("V0", "barrier V0", 0.0, BARRIER_V0_MAX, 0.1, () => resetAll());
 addSlider("barrierThick", "barrier thickness", 4.0, 150.0, 1.0, () => resetAll());
 addSlider("absorbPx", "absorb boundary", 0.0, 160.0, 1.0);
 addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
+addSlider("spinMagnitude", "spin |s|", 0.0, 2.0, 0.5);
 {
   const row = document.createElement("div");
   row.className = "row";
@@ -483,6 +485,7 @@ function buildPrograms() {
     uMass: u(progPartUpdate, "uMass"),
     uDT: u(progPartUpdate, "uDT"),
     uGuidingMode: u(progPartUpdate, "uGuidingMode"),
+    uSpinMagnitude: u(progPartUpdate, "uSpinMagnitude"),
     uSpinSign: u(progPartUpdate, "uSpinSign"),
     uAbsorbPx: u(progPartUpdate, "uAbsorbPx"),
     uRhoMin: u(progPartUpdate, "uRhoMin"),
@@ -674,6 +677,7 @@ function particleUpdate() {
   gl.uniform1f(U.partUpdate.uMass, params.mass);
   gl.uniform1f(U.partUpdate.uDT, params.dt);
   gl.uniform1i(U.partUpdate.uGuidingMode, params.guidingMode | 0);
+  gl.uniform1f(U.partUpdate.uSpinMagnitude, params.spinMagnitude);
   gl.uniform1f(U.partUpdate.uSpinSign, params.spinSign);
 
   gl.uniform1f(U.partUpdate.uAbsorbPx, params.absorbPx);
@@ -999,7 +1003,7 @@ function render() {
 
 function guidingModeLabel() {
   if ((params.guidingMode | 0) === 1) {
-    return `${GUIDING_MODE_NAMES[1]} (${params.spinSign > 0 ? "up" : "down"})`;
+    return `${GUIDING_MODE_NAMES[1]} (${params.spinSign > 0 ? "up" : "down"}, |s| = ${fmt(params.spinMagnitude)} hbar)`;
   }
   return GUIDING_MODE_NAMES[params.guidingMode | 0] ?? GUIDING_MODE_NAMES[0];
 }
