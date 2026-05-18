@@ -235,7 +235,6 @@ addSlider("packetSigma", "packet sigma", 8.0, 80.0, 1.0, () => resetAll());
 addSlider("V0", "barrier V0", 0.0, BARRIER_V0_MAX, 0.1, () => resetAll());
 addSlider("barrierThick", "barrier thickness", 4.0, 150.0, 1.0, () => resetAll());
 addSlider("absorbPx", "absorb boundary", 0.0, 60.0, 1.0);
-addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
 addSlider("spinMagnitude", "spin |s|", 0.0, 2.0, 0.5);
 {
   const row = document.createElement("div");
@@ -298,6 +297,7 @@ addSlider("spinMagnitude", "spin |s|", 0.0, 2.0, 0.5);
 addSectionHeader("Visual Parameters");
 addToggleInt("showPhase", "show phase");
 addToggleInt("showParticles", "show particles");
+addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
 addSlider("dotSize", "particle size", 2.0, 16.0, 0.5);
 addSlider("dotGain", "particle brightness", 0.1, 3.0, 0.1);
 
