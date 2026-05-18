@@ -13,6 +13,7 @@ uniform float uBarrierYFrac;
 uniform float uBarrierThickPx;
 
 uniform float uBarrierOpacity;
+uniform float uBarrierClassicallyForbidden;
 uniform int   uPaletteId;
 
 in vec2 vUV;
@@ -111,7 +112,9 @@ void main(){
   
   float wall = barrierMask(uv);
   float op = clamp(uBarrierOpacity, 0.0, 1.0);
-  vec3 wallCol = vec3(0.20, 0.28, 0.35);
+  vec3 allowedWallCol = vec3(0.20, 0.28, 0.35);
+  vec3 forbiddenWallCol = vec3(0.58, 0.13, 0.10);
+  vec3 wallCol = mix(allowedWallCol, forbiddenWallCol, clamp(uBarrierClassicallyForbidden, 0.0, 1.0));
   float wallAlpha = wall * op;
   col = mix(col, wallCol, wallAlpha);
 

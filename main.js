@@ -742,6 +742,7 @@ function buildPrograms() {
     uBarrierYFrac: u(progWaveRender, "uBarrierYFrac"),
     uBarrierThickPx: u(progWaveRender, "uBarrierThickPx"),
     uBarrierOpacity: u(progWaveRender, "uBarrierOpacity"),
+    uBarrierClassicallyForbidden: u(progWaveRender, "uBarrierClassicallyForbidden"),
     uPaletteId: u(progWaveRender, "uPaletteId"),
   };
 
@@ -1058,6 +1059,11 @@ function computeBarrierOpacity() {
   return 0.85 * t;
 }
 
+function isBarrierClassicallyForbidden() {
+  const kineticEnergy = (params.p0 * params.p0) / (2 * params.mass);
+  return params.V0 > kineticEnergy;
+}
+
 function drawKillBoundary() {
 
   const base = params.absorbPx + params.particleKillMargin;
@@ -1210,6 +1216,9 @@ function render() {
 
   if (U.waveRender.uBarrierOpacity) {
     gl.uniform1f(U.waveRender.uBarrierOpacity, computeBarrierOpacity());
+  }
+  if (U.waveRender.uBarrierClassicallyForbidden) {
+    gl.uniform1f(U.waveRender.uBarrierClassicallyForbidden, isBarrierClassicallyForbidden() ? 1.0 : 0.0);
   }
 
   gl.drawArrays(gl.TRIANGLES, 0, 3);
