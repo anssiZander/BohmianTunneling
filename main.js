@@ -50,10 +50,10 @@ const params = {
 
   showTrail: 1,
   trailHalfLife: 100.0,
-  trailVisGain: 1.,
+  trailVisGain: .8,
   trailVisGamma: 1,
   trailStampGain: 0.55,
-  trailWidth: 4.0,
+  trailWidth: 5.0,
   trailBlendMode: 1,
 
   paletteId: 5,
@@ -95,6 +95,24 @@ const GUIDING_MODE_NAMES = [
 const BARRIER_V0_MAX = 12.0;
 
 let paused = false;
+const RECORDING_CONFIG = {
+  fps: 60,
+  videoBitsPerSecond: 14_000_000,
+  chunkMs: 1000,
+};
+const recordingState = {
+  recorder: null,
+  stream: null,
+  videoTrack: null,
+  manualFrames: false,
+  chunks: [],
+  startedAt: 0,
+  mimeType: "",
+  finalizing: false,
+  lastUrl: null,
+  pendingBlob: null,
+  pendingFileName: "",
+};
 
 const controls = document.getElementById("controls");
 const statsEl = document.getElementById("stats");
@@ -197,7 +215,7 @@ function addSectionHeader(label) {
   header.style.marginBottom = "8px";
   header.style.fontSize = "11px";
   header.style.fontWeight = "700";
-  header.style.color = "#aaa";
+  header.style.color = "#9fbce0";
   header.style.textTransform = "uppercase";
   header.style.letterSpacing = "1px";
   header.textContent = label;
@@ -216,7 +234,7 @@ addSlider("dt", "dt", 0.01, 0.04, 0.001);
 addSlider("packetSigma", "packet sigma", 8.0, 80.0, 1.0, () => resetAll());
 addSlider("V0", "barrier V0", 0.0, BARRIER_V0_MAX, 0.1, () => resetAll());
 addSlider("barrierThick", "barrier thickness", 4.0, 150.0, 1.0, () => resetAll());
-addSlider("absorbPx", "absorb boundary", 0.0, 160.0, 1.0);
+addSlider("absorbPx", "absorb boundary", 0.0, 60.0, 1.0);
 addSlider("nParticles", "particle count", 1, 3000, 1, () => rebuildParticles());
 addSlider("spinMagnitude", "spin |s|", 0.0, 2.0, 0.5);
 {
@@ -287,19 +305,209 @@ addToggleInt("showTrail", "draw trails");
 addSlider("trailHalfLife", "trail half-life", 1.0, 100.0, 1.0);
 //addSlider("trailVisGain", "trail gain", 0.1, 1.0, 0.1);
 //addSlider("trailVisGamma", "trail gamma", 0.4, 2.0, 0.05);
-addSlider("trailWidth", "trail width (px)", 1, 5.0, 1);
+addSlider("trailWidth", "trail width (px)", 1, 9.0, 1);
 
 //addSlider("visGain", "wave gain", 0.5, 20.0, 0.5);
 //addSlider("visGamma", "wave gamma", 0.3, 2.0, 0.05);
 
 document.getElementById("reset").onclick = () => resetAll();
-document.getElementById("pause").onclick = (e) => {
+const pauseButton = document.getElementById("pause");
+const recordButton = document.getElementById("record");
+
+function syncPauseButton() {
+  pauseButton.textContent = paused ? "Resume" : "Pause";
+}
+
+function togglePause() {
   paused = !paused;
-  e.target.textContent = paused ? "Resume" : "Pause";
-};
+  syncPauseButton();
+}
+
+function canRecordCanvas() {
+  return typeof MediaRecorder !== "undefined" && typeof canvas.captureStream === "function" && !!chooseRecordingMimeType();
+}
+
+function isRecording() {
+  return recordingState.recorder?.state === "recording";
+}
+
+function chooseRecordingMimeType() {
+  const candidates = [
+    "video/mp4;codecs=avc1.42E01E",
+    "video/mp4;codecs=avc1.640028",
+    "video/mp4;codecs=h264",
+    "video/mp4",
+  ];
+  return candidates.find(type => MediaRecorder.isTypeSupported?.(type)) || "";
+}
+
+function recordingFileName(startedAt = recordingState.startedAt) {
+  const stamp = new Date(startedAt || Date.now()).toISOString().replace(/[:.]/g, "-");
+  return `bohmian-tunneling-${stamp}.mp4`;
+}
+
+function syncRecordingButton() {
+  const recording = isRecording();
+  const supported = canRecordCanvas();
+  recordButton.textContent = recording ? "Stop Recording" : (recordingState.finalizing ? "Saving Recording..." : "Start Recording");
+  recordButton.classList.toggle("recording", recording);
+  recordButton.disabled = recordingState.finalizing || (!recordingState.pendingBlob && !supported);
+  recordButton.title = recordingState.pendingBlob
+    ? "Download the most recent MP4 recording."
+    : (supported ? "Records the WebGL canvas only; DOM controls are excluded." : "MP4 canvas recording is not supported by this browser.");
+}
+
+function toggleRecording() {
+  if (recordingState.pendingBlob && !isRecording()) downloadPendingRecording(true);
+  else if (isRecording()) stopRecording();
+  else startRecording();
+}
+
+function startRecording() {
+  if (!canRecordCanvas()) {
+    alert("MP4 canvas recording is not supported by this browser.");
+    syncRecordingButton();
+    return;
+  }
+  clearPendingRecording();
+
+  const mimeType = chooseRecordingMimeType();
+  const options = {
+    mimeType,
+    videoBitsPerSecond: RECORDING_CONFIG.videoBitsPerSecond,
+  };
+
+  let stream, recorder, videoTrack, manualFrames = false;
+  try {
+    stream = canvas.captureStream(0);
+    videoTrack = stream.getVideoTracks()[0];
+    manualFrames = typeof videoTrack?.requestFrame === "function";
+    if (!manualFrames) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = canvas.captureStream(RECORDING_CONFIG.fps);
+      videoTrack = stream.getVideoTracks()[0];
+    }
+    recorder = new MediaRecorder(stream, options);
+  } catch (error) {
+    stream?.getTracks().forEach(track => track.stop());
+    alert(`Could not start MP4 recording: ${error.message}`);
+    syncRecordingButton();
+    return;
+  }
+
+  recordingState.recorder = recorder;
+  recordingState.stream = stream;
+  recordingState.videoTrack = videoTrack;
+  recordingState.manualFrames = manualFrames;
+  recordingState.chunks = [];
+  recordingState.startedAt = Date.now();
+  recordingState.mimeType = recorder.mimeType || mimeType;
+  recordingState.finalizing = false;
+
+  recorder.ondataavailable = event => {
+    if (event.data && event.data.size > 0) recordingState.chunks.push(event.data);
+  };
+  recorder.onerror = event => {
+    console.error("Recording error:", event.error || event);
+    stopRecording();
+  };
+  recorder.onstop = finishRecordingDownload;
+  recorder.start(RECORDING_CONFIG.chunkMs);
+  requestRecordingFrame();
+  syncRecordingButton();
+}
+
+function stopRecording() {
+  const recorder = recordingState.recorder;
+  if (!recorder || recorder.state === "inactive") return;
+  recordingState.finalizing = true;
+  syncRecordingButton();
+  try {
+    recorder.requestData();
+  } catch (error) {
+    console.warn("Could not flush recording data:", error);
+  }
+  recorder.stop();
+}
+
+function finishRecordingDownload() {
+  recordingState.stream?.getTracks().forEach(track => track.stop());
+  recordingState.stream = null;
+  recordingState.videoTrack = null;
+  recordingState.manualFrames = false;
+  const chunks = recordingState.chunks;
+  recordingState.chunks = [];
+
+  if (!chunks.length) {
+    recordingState.recorder = null;
+    recordingState.finalizing = false;
+    alert("No recording data was produced.");
+    syncRecordingButton();
+    return;
+  }
+
+  recordingState.pendingBlob = new Blob(chunks, { type: recordingState.mimeType || "video/mp4" });
+  recordingState.pendingFileName = recordingFileName();
+  recordingState.recorder = null;
+  recordingState.finalizing = false;
+  downloadPendingRecording(true);
+  syncRecordingButton();
+}
+
+function requestRecordingFrame() {
+  if (!isRecording() || !recordingState.manualFrames) return;
+  recordingState.videoTrack?.requestFrame?.();
+}
+
+function requestRecordingFrameAfterRender() {
+  if (!isRecording() || !recordingState.manualFrames) return;
+  gl.flush();
+  requestRecordingFrame();
+}
+
+function clearPendingRecording() {
+  if (recordingState.lastUrl) {
+    URL.revokeObjectURL(recordingState.lastUrl);
+    recordingState.lastUrl = null;
+  }
+  recordingState.pendingBlob = null;
+  recordingState.pendingFileName = "";
+}
+
+function downloadPendingRecording(clearAfterClick) {
+  if (!recordingState.pendingBlob) return;
+  if (!recordingState.lastUrl) {
+    recordingState.lastUrl = URL.createObjectURL(recordingState.pendingBlob);
+  }
+  const url = recordingState.lastUrl;
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = recordingState.pendingFileName || recordingFileName();
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  if (clearAfterClick) {
+    recordingState.pendingBlob = null;
+    recordingState.pendingFileName = "";
+    syncRecordingButton();
+    setTimeout(() => {
+      if (recordingState.lastUrl === url) {
+        URL.revokeObjectURL(recordingState.lastUrl);
+        recordingState.lastUrl = null;
+      }
+      syncRecordingButton();
+    }, 1000);
+  }
+}
+
+pauseButton.onclick = togglePause;
+recordButton.onclick = toggleRecording;
+syncPauseButton();
+syncRecordingButton();
+
 window.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "r") resetAll();
-  if (e.key === " ") paused = !paused;
+  if (e.key === " ") togglePause();
 });
 
 const uiBody = document.getElementById("uibody");
@@ -312,6 +520,65 @@ minBtn.onclick = () => {
   uiBody.style.display = uiMinimized ? "none" : "block";
   minBtn.textContent = uiMinimized ? "+" : "-";
 };
+
+const theoryPanel = document.getElementById("theory");
+const theoryBody = document.getElementById("theorybody");
+const theoryBtn = document.getElementById("mintheory");
+
+let theoryMinimized = true;
+function syncTheoryPanel() {
+  theoryPanel.classList.toggle("is-minimized", theoryMinimized);
+  theoryBody.hidden = theoryMinimized;
+  theoryBtn.textContent = theoryMinimized ? "+" : "-";
+  theoryBtn.setAttribute("aria-expanded", String(!theoryMinimized));
+}
+
+theoryBtn.onclick = () => {
+  theoryMinimized = !theoryMinimized;
+  syncTheoryPanel();
+};
+syncTheoryPanel();
+
+const view = {
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0,
+};
+
+function clampViewOffset() {
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  const minX = w * (1 - view.zoom);
+  const minY = h * (1 - view.zoom);
+  view.offsetX = Math.min(0, Math.max(minX, view.offsetX));
+  view.offsetY = Math.min(0, Math.max(minY, view.offsetY));
+}
+
+function applyViewTransform() {
+  clampViewOffset();
+  canvas.style.transformOrigin = "0 0";
+  canvas.style.transform = `translate(${view.offsetX}px, ${view.offsetY}px) scale(${view.zoom})`;
+}
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const cursorX = e.clientX - rect.left;
+  const cursorY = e.clientY - rect.top;
+  const oldZoom = view.zoom;
+  const zoomFactor = Math.exp(-e.deltaY * 0.0012);
+  const nextZoom = Math.min(8, Math.max(1, oldZoom * zoomFactor));
+
+  if (nextZoom === oldZoom) return;
+
+  const worldX = (cursorX - view.offsetX) / oldZoom;
+  const worldY = (cursorY - view.offsetY) / oldZoom;
+  view.zoom = nextZoom;
+  view.offsetX = cursorX - worldX * nextZoom;
+  view.offsetY = cursorY - worldY * nextZoom;
+  applyViewTransform();
+}, { passive: false });
 
 function compile(type, src) {
   const sh = gl.createShader(type);
@@ -1037,7 +1304,10 @@ function resetAll() {
   clearDensity();
 }
 
-window.addEventListener("resize", () => rebuildSimulation());
+window.addEventListener("resize", () => {
+  rebuildSimulation();
+  applyViewTransform();
+});
 
 async function main() {
   await loadShaders();
@@ -1060,6 +1330,7 @@ async function main() {
     }
 
     render();
+    requestRecordingFrameAfterRender();
     updateStats();
     requestAnimationFrame(loop);
   });
