@@ -8,6 +8,8 @@ uniform ivec2 uSimRes;
 uniform float uVisGain;
 uniform float uVisGamma;
 uniform int   uShowPhase;
+uniform float uAbsorbPx;
+uniform float uParticleKillMarginPx;
 
 uniform float uBarrierYFrac;
 uniform float uBarrierThickPx;
@@ -83,6 +85,23 @@ float barrierMask(vec2 uv){
   return band(xPx.y, by, 0.5 * uBarrierThickPx, 1.0);
 }
 
+float detectorVisibility(vec2 uv) {
+  vec2 xPx = uv * (vec2(uSimRes) - vec2(1.0));
+  vec2 maxPx = vec2(uSimRes) - vec2(1.0);
+  float base = uAbsorbPx + uParticleKillMarginPx;
+  float freezeDistX = 2.25 * base;
+  float freezeDistXLeft = 1.20 * freezeDistX;
+  float freezeDistY = 1.50 * base;
+  float fadeWidth = 8.0;
+
+  float left = smoothstep(freezeDistXLeft - fadeWidth, freezeDistXLeft, xPx.x);
+  float right = smoothstep(freezeDistX - fadeWidth, freezeDistX, maxPx.x - xPx.x);
+  float top = smoothstep(freezeDistY - fadeWidth, freezeDistY, xPx.y);
+  float bottom = smoothstep(freezeDistY - fadeWidth, freezeDistY, maxPx.y - xPx.y);
+
+  return min(min(left, right), min(top, bottom));
+}
+
 void main(){
   vec2 uv = vUV;
 
@@ -109,6 +128,7 @@ void main(){
     col = palette(I, a,b,c,d) * I;
   }
 
+  col *= detectorVisibility(uv);
   
   float wall = barrierMask(uv);
   float op = clamp(uBarrierOpacity, 0.0, 1.0);

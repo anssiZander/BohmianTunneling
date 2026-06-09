@@ -18,9 +18,21 @@ uniform float uSpinSign;
 uniform float uParticleKillMarginPx;
 
 uniform float uAbsorbPx;
+uniform float uBoundaryFreezeChance;
+uniform int uPhysicsFrame;
 
 uniform float uRhoMin;
 uniform float uVelClamp;
+
+float random01(float seed) {
+  return fract(sin(seed) * 43758.5453123);
+}
+
+bool boundaryDetectionRoll() {
+  float chance = clamp(uBoundaryFreezeChance, 0.0, 1.0);
+  float seed = float(gl_VertexID + 1) * 12.9898 + float(uPhysicsFrame + 1) * 78.233;
+  return random01(seed) < chance;
+}
 
 struct BoundaryAction {
   bool freeze;
@@ -40,29 +52,25 @@ BoundaryAction boundaryAction(vec2 xPx) {
 
   BoundaryAction a;
   a.freeze = false;
-  a.frozenPos = xPx;
+  a.frozenPos = clamp(xPx, vec2(0.0), vec2(w, h));
 
   if (xPx.x < freezeDistXLeft) {
     a.freeze = true;
-    a.frozenPos = vec2(freezeDistXLeft, clamp(xPx.y, 0.0, h));
     return a;
   }
 
   if (xPx.x > (w - freezeDistX)) {
     a.freeze = true;
-    a.frozenPos = vec2(w - freezeDistX, clamp(xPx.y, 0.0, h));
     return a;
   }
 
   if (xPx.y < freezeDistY) {
     a.freeze = true;
-    a.frozenPos = vec2(clamp(xPx.x, 0.0, w), freezeDistY);
     return a;
   }
 
   if (xPx.y > (h - freezeDistY)) {
     a.freeze = true;
-    a.frozenPos = vec2(clamp(xPx.x, 0.0, w), h - freezeDistY);
     return a;
   }
 
@@ -151,7 +159,8 @@ void main() {
   }
 
   BoundaryAction act0 = boundaryAction(x);
-  if (act0.freeze) {
+  bool detectedAtBoundary = boundaryDetectionRoll();
+  if (act0.freeze && detectedAtBoundary) {
     vState = vec4(act0.frozenPos, 2.0, 0.0);
     gl_Position = vec4(-2.0);
     return;
@@ -161,7 +170,7 @@ void main() {
   vec2 xm = clamp(x + 0.5 * uDT * v1, vec2(0.0), vec2(uSimRes) - vec2(1.0));
 
   BoundaryAction actM = boundaryAction(xm);
-  if (actM.freeze) {
+  if (actM.freeze && detectedAtBoundary) {
     vState = vec4(actM.frozenPos, 2.0, 0.0);
     gl_Position = vec4(-2.0);
     return;
@@ -171,7 +180,7 @@ void main() {
   vec2 xn = x + uDT * v2;
 
   BoundaryAction actN = boundaryAction(xn);
-  if (actN.freeze) {
+  if (actN.freeze && detectedAtBoundary) {
     vState = vec4(actN.frozenPos, 2.0, 0.0);
     gl_Position = vec4(-2.0);
     return;

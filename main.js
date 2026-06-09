@@ -18,7 +18,7 @@ const params = {
   hbar: 6.0,
   mass: 1.0,
   p0: 4.5,
-  dt: 0.02,
+  dt: 0.01,
 
   packetX: 0.3,
   packetY: 0.3,
@@ -37,27 +37,29 @@ const params = {
   velClamp: 160.0,
   guidingMode: 1,
   spinSign: 1,
-  spinMagnitude: 0.5,
+  spinMagnitude: 1,
 
   visGain: 20.0,
   visGamma: 0.5,
   showPhase: 1,
 
   showParticles: 1,
-  dotSize: 7.0,
+  dotSize: 12.0,
   dotSigma: 0.28,
   dotGain: 1.,
 
   showTrail: 1,
-  trailHalfLife: 100.0,
+  trailHalfLife: 30.0,
   trailVisGain: .8,
   trailVisGamma: 1,
   trailStampGain: 0.55,
-  trailWidth: 5.0,
+  trailWidth: 7.0,
   trailBlendMode: 1,
 
   paletteId: 5,
 };
+
+const BOUNDARY_FREEZE_DETECTION_CHANCE = 0.0001;
 
 const PALETTE_NAMES = [
   "Nebula",
@@ -680,6 +682,7 @@ let U = {};
 
 let vaoKillBoundary = null;
 let boundaryBuffer = null;
+let physicsFrame = 0;
 
 function buildPrograms() {
   const vsFull = compile(gl.VERTEX_SHADER, SH["fullscreen.vert"]);
@@ -739,6 +742,8 @@ function buildPrograms() {
     uVisGain: u(progWaveRender, "uVisGain"),
     uVisGamma: u(progWaveRender, "uVisGamma"),
     uShowPhase: u(progWaveRender, "uShowPhase"),
+    uAbsorbPx: u(progWaveRender, "uAbsorbPx"),
+    uParticleKillMarginPx: u(progWaveRender, "uParticleKillMarginPx"),
     uBarrierYFrac: u(progWaveRender, "uBarrierYFrac"),
     uBarrierThickPx: u(progWaveRender, "uBarrierThickPx"),
     uBarrierOpacity: u(progWaveRender, "uBarrierOpacity"),
@@ -756,6 +761,8 @@ function buildPrograms() {
     uSpinMagnitude: u(progPartUpdate, "uSpinMagnitude"),
     uSpinSign: u(progPartUpdate, "uSpinSign"),
     uAbsorbPx: u(progPartUpdate, "uAbsorbPx"),
+    uBoundaryFreezeChance: u(progPartUpdate, "uBoundaryFreezeChance"),
+    uPhysicsFrame: u(progPartUpdate, "uPhysicsFrame"),
     uRhoMin: u(progPartUpdate, "uRhoMin"),
     uVelClamp: u(progPartUpdate, "uVelClamp"),
     uParticleKillMarginPx: u(progPartUpdate, "uParticleKillMarginPx"),
@@ -949,6 +956,8 @@ function particleUpdate() {
   gl.uniform1f(U.partUpdate.uSpinSign, params.spinSign);
 
   gl.uniform1f(U.partUpdate.uAbsorbPx, params.absorbPx);
+  gl.uniform1f(U.partUpdate.uBoundaryFreezeChance, BOUNDARY_FREEZE_DETECTION_CHANCE);
+  gl.uniform1i(U.partUpdate.uPhysicsFrame, physicsFrame);
   gl.uniform1f(U.partUpdate.uParticleKillMarginPx, params.particleKillMargin);
   gl.uniform1f(U.partUpdate.uRhoMin, params.rhoMin);
   gl.uniform1f(U.partUpdate.uVelClamp, params.velClamp);
@@ -971,6 +980,8 @@ function particleUpdate() {
   gl.bindBuffer(gl.ARRAY_BUFFER, particleSrc);
   gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 16, 0);
   gl.bindVertexArray(null);
+
+  physicsFrame = (physicsFrame + 1) % 1000000000;
 }
 
 const LN2 = Math.log(2);
@@ -1208,6 +1219,8 @@ function render() {
   gl.uniform1f(U.waveRender.uVisGain, params.visGain);
   gl.uniform1f(U.waveRender.uVisGamma, params.visGamma);
   gl.uniform1i(U.waveRender.uShowPhase, params.showPhase);
+  gl.uniform1f(U.waveRender.uAbsorbPx, params.absorbPx);
+  gl.uniform1f(U.waveRender.uParticleKillMarginPx, params.particleKillMargin);
 
   gl.uniform1f(U.waveRender.uBarrierYFrac, params.barrierY);
   gl.uniform1f(U.waveRender.uBarrierThickPx, params.barrierThick);
@@ -1305,12 +1318,14 @@ function rebuildSimulation() {
   resetWave();
   rebuildParticles();
   rebuildDensity();
+  physicsFrame = 0;
 }
 
 function resetAll() {
   resetWave();
   rebuildParticles();
   clearDensity();
+  physicsFrame = 0;
 }
 
 window.addEventListener("resize", () => {
