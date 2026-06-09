@@ -49,9 +49,9 @@ const params = {
   dotGain: 1.,
 
   showTrail: 1,
-  trailHalfLife: 30.0,
-  trailVisGain: .8,
-  trailVisGamma: 1,
+  trailHalfLife: 40.0,
+  trailVisGain: .2,
+  trailVisGamma: .4,
   trailStampGain: 0.55,
   trailWidth: 7.0,
   trailBlendMode: 1,
