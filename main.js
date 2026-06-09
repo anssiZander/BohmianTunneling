@@ -44,50 +44,20 @@ const params = {
   showPhase: 1,
 
   showParticles: 1,
-  dotSize: 12.0,
+  dotSize: 16.0,
   dotSigma: 0.28,
   dotGain: 1.,
 
   showTrail: 1,
-  trailHalfLife: 40.0,
+  trailHalfLife: 30.0,
   trailVisGain: .5,
   trailVisGamma: .6,
   trailStampGain: 0.55,
-  trailWidth: 7.0,
+  trailWidth: 6.0,
   trailBlendMode: 1,
-
-  paletteId: 5,
 };
 
 const BOUNDARY_FREEZE_DETECTION_CHANCE = 0.0001;
-
-const PALETTE_NAMES = [
-  "Nebula",
-  "Synthwave",
-  "Viridis-ish",
-  "Inferno-ish",
-  "Ice",
-  "Plasma Drift",
-  "Arctic Aurora",
-  "Solar Flare",
-  "Cosmic Dust",
-  "Neon Noir",
-  "Pastel Mirage"
-];
-
-const PALETTE_COMPLEMENTS = [
-  [0.92,0.93,0.88],
-  [0.10,0.60,0.10],
-  [0.80,0.60,0.55],
-  [0.10,0.60,0.80],
-  [0.80,0.30,0.15],
-  [0.20,0.80,0.30],
-  [0.85,0.25,0.25],
-  [0.10,0.10,0.80],
-  [0.40,0.50,0.70],
-  [0.90,0.90,0.10],
-  [0.40,0.40,0.60]
-];
 
 const GUIDING_MODE_NAMES = [
   "Schrodinger",
@@ -748,7 +718,6 @@ function buildPrograms() {
     uBarrierThickPx: u(progWaveRender, "uBarrierThickPx"),
     uBarrierOpacity: u(progWaveRender, "uBarrierOpacity"),
     uBarrierClassicallyForbidden: u(progWaveRender, "uBarrierClassicallyForbidden"),
-    uPaletteId: u(progWaveRender, "uPaletteId"),
   };
 
   U.partUpdate = {
@@ -773,7 +742,6 @@ function buildPrograms() {
     uPointSize: u(progPartView, "uPointSize"),
     uDotSigma: u(progPartView, "uDotSigma"),
     uDotGain: u(progPartView, "uDotGain"),
-    uPaletteId: u(progPartView, "uPaletteId"),
   };
 
   U.partStamp = {
@@ -795,7 +763,6 @@ function buildPrograms() {
     uDensity: u(progDensityRender, "uDensity"),
     uGain: u(progDensityRender, "uGain"),
     uGamma: u(progDensityRender, "uGamma"),
-    uPaletteId: u(progDensityRender, "uPaletteId"),
     uBlendMode: u(progDensityRender, "uBlendMode"),
   };
 }
@@ -1150,10 +1117,9 @@ function drawKillBoundary() {
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-  let comp = PALETTE_COMPLEMENTS[params.paletteId | 0] || [1,1,1];
   const alpha = 0.15;
   const colorLoc = gl.getUniformLocation(progBoundary, 'uBoundaryColor');
-  gl.uniform4f(colorLoc, comp[0], comp[1], comp[2], alpha);
+  gl.uniform4f(colorLoc, 0.20, 0.80, 0.30, alpha);
 
   const boundaryRectLoc = gl.getUniformLocation(progBoundary, 'uBoundaryRect');
 
@@ -1225,8 +1191,6 @@ function render() {
   gl.uniform1f(U.waveRender.uBarrierYFrac, params.barrierY);
   gl.uniform1f(U.waveRender.uBarrierThickPx, params.barrierThick);
 
-  gl.uniform1i(U.waveRender.uPaletteId, params.paletteId | 0);
-
   if (U.waveRender.uBarrierOpacity) {
     gl.uniform1f(U.waveRender.uBarrierOpacity, computeBarrierOpacity());
   }
@@ -1260,7 +1224,6 @@ function render() {
 
     gl.uniform1f(U.densityRender.uGain, params.trailVisGain);
     gl.uniform1f(U.densityRender.uGamma, params.trailVisGamma);
-    gl.uniform1i(U.densityRender.uPaletteId, params.paletteId | 0);
     gl.uniform1i(U.densityRender.uBlendMode, params.trailBlendMode | 0);
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -1281,7 +1244,6 @@ function render() {
     gl.uniform1f(U.partView.uPointSize, params.dotSize);
     gl.uniform1f(U.partView.uDotSigma, params.dotSigma);
     gl.uniform1f(U.partView.uDotGain, params.dotGain);
-    gl.uniform1i(U.partView.uPaletteId, params.paletteId | 0);
 
     gl.drawArrays(gl.POINTS, 0, Math.floor(params.nParticles));
 
