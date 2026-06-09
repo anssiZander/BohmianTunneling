@@ -34,17 +34,6 @@ vec3 densityPalette(float t) {
   return a + b * cos(6.283185 * (t + d));
 }
 
-float band(float x, float c, float halfW, float feather){
-  return smoothstep(c-halfW-feather, c-halfW, x) *
-         (1.0 - smoothstep(c+halfW, c+halfW+feather, x));
-}
-
-float barrierMask(vec2 uv){
-  vec2 xPx = uv * vec2(uSimRes);
-  float by = uBarrierYFrac * float(uSimRes.y);
-  return band(xPx.y, by, 0.5 * uBarrierThickPx, 1.0);
-}
-
 float detectorVisibility(vec2 uv) {
   vec2 xPx = uv * (vec2(uSimRes) - vec2(1.0));
   vec2 maxPx = vec2(uSimRes) - vec2(1.0);
@@ -82,13 +71,36 @@ void main(){
 
   col *= detectorVisibility(uv);
   
-  float wall = barrierMask(uv);
+  vec2 xPx = uv * vec2(uSimRes);
+  float barrierY = uBarrierYFrac * float(uSimRes.y);
+  float halfWidth = max(0.5 * uBarrierThickPx, 1.0);
+  float barrierOffset = xPx.y - barrierY;
+  float wall = 1.0 - smoothstep(halfWidth, halfWidth + 1.0, abs(barrierOffset));
   float op = clamp(uBarrierOpacity, 0.0, 1.0);
-  vec3 allowedWallCol = vec3(0.20, 0.28, 0.35);
-  vec3 forbiddenWallCol = vec3(0.58, 0.13, 0.10);
-  vec3 wallCol = mix(allowedWallCol, forbiddenWallCol, clamp(uBarrierClassicallyForbidden, 0.0, 1.0));
+  float forbidden = clamp(uBarrierClassicallyForbidden, 0.0, 1.0);
+
+  vec3 allowedWallCol = vec3(0.10, 0.22, 0.29);
+  vec3 forbiddenWallCol = vec3(0.58, 0.18, 0.11);
+  vec3 allowedAccent = vec3(0.32, 0.62, 0.70);
+  vec3 forbiddenAccent = vec3(1.00, 0.48, 0.24);
+  vec3 wallCol = mix(allowedWallCol, forbiddenWallCol, forbidden);
+  vec3 accentCol = mix(allowedAccent, forbiddenAccent, forbidden);
+
+  float wallY = clamp(0.5 + 0.5 * barrierOffset / halfWidth, 0.0, 1.0);
+  float centerSheen = 1.0 - smoothstep(0.0, 0.85, abs(barrierOffset) / halfWidth);
+  wallCol *= mix(mix(0.82, 0.92, forbidden), 1.08, wallY);
+  wallCol += accentCol * (mix(0.045, 0.065, forbidden) * centerSheen);
+
   float wallAlpha = wall * op;
   col = mix(col, wallCol, wallAlpha);
+
+  float topEdge = 1.0 - smoothstep(0.0, 1.5, abs(barrierOffset - halfWidth));
+  float bottomEdge = 1.0 - smoothstep(0.0, 1.5, abs(barrierOffset + halfWidth));
+  float outerGlow = (1.0 - smoothstep(1.0, 7.0, abs(abs(barrierOffset) - halfWidth))) * (1.0 - wall);
+
+  col = mix(col, accentCol, topEdge * op * 0.38);
+  col = mix(col, wallCol * 0.42, bottomEdge * op * 0.32);
+  col += 9.*accentCol * outerGlow * op * 0.065;
 
   fragColor = vec4(col, 1.0);
 }

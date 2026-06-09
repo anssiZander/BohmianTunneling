@@ -13,11 +13,11 @@ if (!extFloatRT) {
 
 const params = {
   simScale: .5,
-  stepsPerFrame: 20,
+  stepsPerFrame: 10,
 
   hbar: 6.0,
   mass: 1.0,
-  p0: 4.5,
+  p0: 4.,
   dt: 0.01,
 
   packetX: 0.3,
@@ -26,18 +26,18 @@ const params = {
 
   barrierY: 0.55,
   barrierThick: 50.0,
-  V0: 5.0,
+  V0: 4.0,
 
   absorbPx: 40.0,
   absorbStrength: 3.,
   particleKillMargin: 12.0,
 
-  nParticles: 400,
+  nParticles: 200,
   rhoMin: 1e-6,
   velClamp: 160.0,
   guidingMode: 1,
   spinSign: 1,
-  spinMagnitude: 1,
+  spinMagnitude: .5,
 
   visGain: 20.0,
   visGamma: 0.5,
@@ -64,7 +64,7 @@ const GUIDING_MODE_NAMES = [
   "Pauli spin"
 ];
 
-const BARRIER_V0_MAX = 12.0;
+const BARRIER_V0_MAX = 9.0;
 
 let paused = false;
 const RECORDING_CONFIG = {
@@ -199,7 +199,7 @@ addSlider("simScale", "sim scale", 0.25, 1.0, 0.05, () => rebuildSimulation());
 addSlider("stepsPerFrame", "Steps/frame", 1, 100, 1);
 
 addSectionHeader("Physical Parameters");
-addSlider("p0", "momentum p", 0.5, 8.0, 0.1, () => resetAll());
+addSlider("p0", "momentum p", 0.5, 6.0, 0.1, () => resetAll());
 addSlider("dt", "dt", 0.01, 0.04, 0.001);
 //addSlider("packetX", "packet start x", 0.05, 0.95, 0.01, () => resetAll());
 //addSlider("packetY", "packet start y", 0.05, 0.95, 0.01, () => resetAll());
@@ -517,6 +517,9 @@ const view = {
   offsetY: 0,
 };
 
+const INITIAL_VISIBLE_FRACTION = 0.85;
+let userAdjustedView = false;
+
 function clampViewOffset() {
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
@@ -532,8 +535,17 @@ function applyViewTransform() {
   canvas.style.transform = `translate(${view.offsetX}px, ${view.offsetY}px) scale(${view.zoom})`;
 }
 
+function applyInitialViewTransform() {
+  const visibleFraction = Math.min(1, Math.max(0.2, INITIAL_VISIBLE_FRACTION));
+  view.zoom = 1 / visibleFraction;
+  view.offsetX = canvas.clientWidth * (1 - view.zoom) * 0.5;
+  view.offsetY = canvas.clientHeight * (1 - view.zoom) * 0.5;
+  applyViewTransform();
+}
+
 canvas.addEventListener("wheel", (e) => {
   e.preventDefault();
+  userAdjustedView = true;
 
   const rect = canvas.parentElement.getBoundingClientRect();
   const cursorX = e.clientX - rect.left;
@@ -1292,13 +1304,18 @@ function resetAll() {
 
 window.addEventListener("resize", () => {
   rebuildSimulation();
-  applyViewTransform();
+  if (userAdjustedView) {
+    applyViewTransform();
+  } else {
+    applyInitialViewTransform();
+  }
 });
 
 async function main() {
   await loadShaders();
   buildPrograms();
   rebuildSimulation();
+  applyInitialViewTransform();
   updateStats();
 
   params.trailHalfLife*=0.99;

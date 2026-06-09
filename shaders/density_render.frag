@@ -19,8 +19,8 @@ void main(){
   v = pow(clamp(v, 0.0, 1.0), uGamma);
 
   vec3 col = vec3(1.0, 1.0, 0.0);
-  float crowded = smoothstep(1.6, 5.0, exposure);
-  float oversaturated = smoothstep(5.0, 10.0, exposure);
+  float crowded = smoothstep(1., 3.0, exposure);
+  float oversaturated = smoothstep(3.0, 5.0, exposure);
   col = mix(col, vec3(1.0, 0.55, 0.08), 0.45 * crowded);
   col = mix(col, vec3(1.0, 0.35, 0.62), 0.30 * oversaturated);
 
