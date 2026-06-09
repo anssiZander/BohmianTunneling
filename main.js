@@ -50,8 +50,8 @@ const params = {
 
   showTrail: 1,
   trailHalfLife: 40.0,
-  trailVisGain: .2,
-  trailVisGamma: .4,
+  trailVisGain: .5,
+  trailVisGamma: .6,
   trailStampGain: 0.55,
   trailWidth: 7.0,
   trailBlendMode: 1,
@@ -1272,7 +1272,7 @@ function render() {
 
   if (params.showParticles) {
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.useProgram(progPartView);
     gl.bindVertexArray(vaoParticles);

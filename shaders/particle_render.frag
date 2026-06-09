@@ -31,26 +31,24 @@ void getPaletteParams(int id, out vec3 a, out vec3 b, out vec3 c, out vec3 d)
 void main(){
   if(vAlive < 0.5) discard;
 
-  
-  vec2 p = gl_PointCoord - vec2(0.5);
-  float r = length(p);           
-
-  
-  if(r > 0.5) discard;
-
-  
-  float edge = smoothstep(0.5, 0.42, r);
-
-  
-  float s = max(uDotSigma, 1e-4);
-  float blur = exp(-(r*r) / s);
-
-  float a = uDotGain * blur * edge;
-  a = clamp(a, 0.0, 0.85);
+  vec2 p = gl_PointCoord * 2.0 - vec2(1.0);
+  float r2 = dot(p, p);
+  if(r2 > 1.0) discard;
 
   vec3 A,B,C,D;
   getPaletteParams(uPaletteId, A,B,C,D);
-  vec3 col = palette(0.85, A,B,C,D);
+  vec3 particleCol = max(palette(0.85, A,B,C,D), vec3(0.0));
+
+  float softness = clamp(uDotSigma, 0.08, 0.65);
+  float halo = exp(-r2 / softness) * (1.0 - smoothstep(0.72, 1.0, r2));
+  float body = 1.0 - smoothstep(0.16, 0.72, r2);
+  float core = 1.0 - smoothstep(0.0, 0.13, r2);
+
+  vec3 col = mix(particleCol * 0.72, particleCol * 1.18, body);
+  col = mix(col, vec3(1.0, 0.98, 0.88), core * 0.92);
+
+  float a = uDotGain * (11.72 * halo + 0.78 * body + 0.28 * core);
+  a = clamp(a, 0.0, 0.92);
 
   fragColor = vec4(col, a);
 }
